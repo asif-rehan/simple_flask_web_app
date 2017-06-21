@@ -2,6 +2,8 @@ from flask import Flask
 from flask import request
 from flask import json
 from flask import Response
+from flask import jsonify
+from functools import wraps
 
 app = Flask(__name__)
 
@@ -81,6 +83,7 @@ def not_found(error=None):
     return resp
 
 @app.route('/users/<userid>', methods = ['GET'])
+@requires_auth
 def api_users(userid):
     users = {'1':'john', '2':'steve', '3':'bill'}
     
@@ -88,6 +91,31 @@ def api_users(userid):
         return jsonify({userid:users[userid]})
     else:
         return not_found()
+
+def check_auth(username, password):
+    return username == 'admin' and password == 'secret'
+
+def authenticate():
+    message = {'message': "Authenticate."}
+    resp = jsonify(message)
+
+    resp.status_code = 401
+    resp.headers['WWW-Authenticate'] = 'Basic realm="Example"'
+
+    return resp
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth: 
+            return authenticate()
+
+        elif not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+
+    return decorated
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')
